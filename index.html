@@ -1,165 +1,658 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Library Seat System</title>
-<style>
-body{font-family:Arial;text-align:center;background:#f2f2f2}
-h2{margin:8px}
-.controls{margin:10px}
-button{padding:6px 12px;margin:4px}
-.grid{
-  display:grid;
-  grid-template-columns: repeat(25, 32px);
-  gap:6px;
-  justify-content:center;
-  margin-top:15px;
-}
-.seat{
-  width:32px;height:32px;border-radius:4px;
-  border:1px solid #333;cursor:pointer;
-}
-.vacant{background:white}
-.paid{background:green}
-.due{background:red}
+<title>Chanakya Library Management</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-#formBox{
- display:none;background:white;padding:10px;
- width:280px;margin:10px auto;border-radius:8px
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#1e1e2f;
+color:white;
 }
-input{width:95%;margin:4px;padding:5px}
+
+.header{
+background:#111;
+padding:15px;
+text-align:center;
+font-size:20px;
+}
+
+.card{
+background:white;
+color:black;
+margin:15px;
+padding:15px;
+border-radius:10px;
+}
+
+button,input{
+width:100%;
+padding:8px;
+margin:6px 0;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+button{
+background:#1e3c72;
+color:white;
+border:none;
+cursor:pointer;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(10,1fr);
+gap:5px;
+}
+
+.seat{
+padding:8px;
+font-size:11px;
+border-radius:5px;
+text-align:center;
+cursor:pointer;
+color:white;
+}
+
+.vacant{background:#777;}
+.paid{background:green;}
+.due{background:red;}
+.pendingPayment{background:orange;}
+.pendingMember{background:#0066cc;}
+
+.stat{
+background:#f4f6f9;
+padding:8px;
+margin:5px 0;
+border-radius:6px;
+font-size:13px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+font-size:12px;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:5px;
+text-align:center;
+}
 </style>
 </head>
-
 <body>
 
-<h2>Library Seat Management (350 Seats)</h2>
-
-<div class="controls">
-<button onclick="normalMode()">Seat Allotment Mode</button>
-<button onclick="feesMode()">Fees Collection Mode</button>
-<button onclick="exportData()">Export to Excel</button>
-</div>
-
-<div class="grid" id="seatGrid"></div>
-
-<div id="formBox">
-<h3>Member Details</h3>
-<input id="name" placeholder="Name">
-<input id="mobile" placeholder="Mobile">
-<input id="address" placeholder="Address">
-<input id="date" type="date">
-<br>
-<button onclick="saveMember()">Save</button>
-<button onclick="markPaid()">Mark Fee Paid</button>
-<button onclick="vacate()">Vacate Seat</button>
-</div>
+<div class="header">The Chanakya Library</div>
+<div id="app"></div>
 
 <script>
-let seats = JSON.parse(localStorage.getItem("librarySeats")) || {};
-let memberID = parseInt(localStorage.getItem("memberID")) || 1000;
-let selectedSeat = null;
-let mode="normal";
+// ================= STORAGE =================
 
-function saveStorage(){
- localStorage.setItem("librarySeats", JSON.stringify(seats));
- localStorage.setItem("memberID", memberID);
+let members = JSON.parse(localStorage.getItem("members") || "[]");
+let pendingMembers = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+let payments = JSON.parse(localStorage.getItem("payments") || "[]");
+let pendingPayments = JSON.parse(localStorage.getItem("pendingPayments") || "[]");
+let deletedMembers = JSON.parse(localStorage.getItem("deletedMembers") || "[]");
+let monthlyFee = parseInt(localStorage.getItem("monthlyFee") || "700");
+let currentUser = "";
+
+function saveAll(){
+localStorage.setItem("members", JSON.stringify(members));
+localStorage.setItem("pendingMembers", JSON.stringify(pendingMembers));
+localStorage.setItem("payments", JSON.stringify(payments));
+localStorage.setItem("pendingPayments", JSON.stringify(pendingPayments));
+localStorage.setItem("deletedMembers", JSON.stringify(deletedMembers));
+localStorage.setItem("monthlyFee", monthlyFee);
 }
 
-function createSeats(){
- let grid=document.getElementById("seatGrid");
- for(let i=1;i<=350;i++){
-   let d=document.createElement("div");
-   d.className="seat vacant";
-   d.id="s"+i;
-   d.onclick=()=>seatClick(i);
-   grid.appendChild(d);
- }
-}
-createSeats();
-updateColors();
+// ================= LOGIN =================
 
-function seatClick(num){
- selectedSeat=num;
- if(mode==="fees"){
-   if(seats[num]){
-     seats[num].status="paid";
-     saveStorage();
-     updateColors();
-   }
-   return;
- }
- document.getElementById("formBox").style.display="block";
- let data=seats[num];
- document.getElementById("name").value=data?data.name:"";
- document.getElementById("mobile").value=data?data.mobile:"";
- document.getElementById("address").value=data?data.address:"";
- document.getElementById("date").value=data?data.date:"";
+function loginPage(){
+app.innerHTML = `
+<div class="card">
+<h3>Login</h3>
+<input id="uid" placeholder="User ID">
+<input type="password" id="pwd" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>`;
 }
 
-function saveMember(){
- if(!seats[selectedSeat]) memberID++;
- seats[selectedSeat]={
-   id:memberID,
-   seat:selectedSeat,
-   name:name.value,
-   mobile:mobile.value,
-   address:address.value,
-   date:date.value,
-   status:"due"
- };
- saveStorage();
- updateColors();
+function login(){
+let id = document.getElementById("uid").value;
+let pw = document.getElementById("pwd").value;
+
+if(id==="Chanakya" && pw==="Ayush@821"){
+currentUser="owner";
+dashboard();
+}
+else if(id==="Staff" && pw==="Staff@123"){
+currentUser="staff";
+dashboard();
+}
+else{
+alert("Invalid Credentials");
+}
 }
 
-function markPaid(){
- if(seats[selectedSeat]){
-   seats[selectedSeat].status="paid";
-   saveStorage();
-   updateColors();
- }
+// ================= CALCULATIONS =================
+
+function monthsBetween(joinDate){
+let start = new Date(joinDate);
+let now = new Date();
+
+let months = (now.getFullYear()-start.getFullYear())*12;
+months += now.getMonth()-start.getMonth();
+
+if(now.getDate() >= start.getDate()) months++;
+
+return months <= 0 ? 1 : months;
 }
 
-function vacate(){
- delete seats[selectedSeat];
- saveStorage();
- updateColors();
+function totalPaid(memberId){
+return payments
+.filter(p => p.memberId === memberId)
+.reduce((sum,p)=> sum + parseInt(p.amount),0);
 }
 
-function updateColors(){
- for(let i=1;i<=350;i++){
-   let seat=document.getElementById("s"+i);
-   if(seats[i]){
-     seat.className="seat "+(seats[i].status==="paid"?"paid":"due");
-   }else{
-     seat.className="seat vacant";
-   }
- }
+function collectionToday(){
+let today = new Date().toISOString().split("T")[0];
+return payments
+.filter(p=>p.date===today)
+.reduce((sum,p)=>sum + parseInt(p.amount),0);
 }
 
-function normalMode(){
- mode="normal";
- alert("Seat Allotment Mode");
+function collectionMonth(){
+let now = new Date();
+return payments.filter(p=>{
+let d = new Date(p.date);
+return d.getMonth()===now.getMonth() &&
+d.getFullYear()===now.getFullYear();
+}).reduce((sum,p)=>sum + parseInt(p.amount),0);
 }
 
-function feesMode(){
- mode="fees";
- alert("Fees Collection Mode: Click red seats to mark paid");
+function vacantSeats(){
+return TOTAL_SEATS - members.length - pendingMembers.length;
 }
 
-function exportData(){
- let csv="MemberID,Seat,Name,Mobile,Address,JoinDate,Status\n";
- for(let s in seats){
-   let m=seats[s];
-   csv+=`${m.id},${m.seat},${m.name},${m.mobile},${m.address},${m.date},${m.status}\n`;
- }
- let blob=new Blob([csv],{type:"text/csv"});
- let a=document.createElement("a");
- a.href=URL.createObjectURL(blob);
- a.download="library_data.csv";
- a.click();
+// ================= DASHBOARD =================
+
+function dashboard(){
+
+app.innerHTML = `
+<div class="card">
+<h3>Dashboard (${currentUser})</h3>
+
+<div class="stat">Active Members: ${members.length}</div>
+<div class="stat">Vacant Seats: ${vacantSeats()}</div>
+<div class="stat">Pending Member Approvals: ${pendingMembers.length}</div>
+<div class="stat">Pending Payments: ${pendingPayments.length}</div>
+<div class="stat">Total Collection Today: ₹${collectionToday()}</div>
+<div class="stat">Total Collection This Month: ₹${collectionMonth()}</div>
+<div class="stat">Monthly Fee: ₹${monthlyFee}</div>
+
+<button onclick="seatLayout()">Seat Layout</button>
+<button onclick="feesModule()">Fees Module</button>
+
+${currentUser==="owner" ? `
+<button onclick="approvalPanel()">Approvals</button>
+<button onclick="deletedModule()">Deleted Members</button>
+<button onclick="changeFee()">Change Monthly Fee</button>
+` : ""}
+
+<button onclick="logout()">Logout</button>
+</div>
+`;
+}
+
+function changeFee(){
+let newFee = prompt("Enter New Monthly Fee", monthlyFee);
+if(newFee && !isNaN(newFee)){
+monthlyFee = parseInt(newFee);
+saveAll();
+dashboard();
+}
+}
+
+function logout(){
+currentUser="";
+loginPage();
+}
+
+loginPage();
+// ================= SEAT LAYOUT =================
+
+function seatLayout(){
+
+let html = `<div class="card">
+<h3>Seat Layout</h3>
+<div class="grid">`;
+
+for(let i=1;i<=320;i++){
+
+let member = members.find(m=>m.seat===i);
+let pendingMember = pendingMembers.find(m=>m.seat===i);
+
+if(pendingMember){
+html += `<div class="seat pendingMember">${i}</div>`;
+}
+else if(member){
+
+let expected = monthsBetween(member.joinDate) * monthlyFee;
+let paid = totalPaid(member.id);
+let paymentPending = pendingPayments.some(p=>p.memberId===member.id);
+
+if(paymentPending){
+html += `<div class="seat pendingPayment" onclick="viewMember('${member.id}')">${i}</div>`;
+}
+else if(paid >= expected){
+html += `<div class="seat paid" onclick="viewMember('${member.id}')">${i}</div>`;
+}
+else{
+html += `<div class="seat due" onclick="viewMember('${member.id}')">${i}</div>`;
+}
+}
+else{
+html += `<div class="seat vacant" onclick="addMember(${i})">${i}</div>`;
+}
+}
+
+html += `</div>
+<button onclick="dashboard()">Back</button>
+</div>`;
+
+app.innerHTML = html;
+}
+
+// ================= ADD MEMBER =================
+
+function addMember(seat){
+
+app.innerHTML = `
+<div class="card">
+<h3>Add Member - Seat ${seat}</h3>
+
+<input id="mName" placeholder="Full Name">
+<input id="mFatherName" placeholder="Father's Name">
+<input id="mMobile" placeholder="Mobile Number">
+<input id="mAddress" placeholder="Address">
+<input type="date" id="mJoin" value="${new Date().toISOString().split("T")[0]}">
+
+<button onclick="saveMember(${seat})">Save & Go To Fee</button>
+<button onclick="seatLayout()">Cancel</button>
+</div>`;
+}
+
+function saveMember(seat){
+
+let id = "M" + Date.now();
+
+let name = document.getElementById("mName").value.trim();
+let FatherName = document.getElementById("mFatherName").value.trim();
+let mobile = document.getElementById("mMobile").value.trim();
+let address = document.getElementById("mAddress").value.trim();
+let join = document.getElementById("mJoin").value;
+
+if(!name || !mobile || !join){
+alert("Please fill required fields");
+return;
+}
+
+pendingMembers.push({
+id:id,
+name:name,
+FatherName:FatherName,
+mobile:mobile,
+address:address,
+joinDate:join,
+seat:seat
+});
+
+saveAll();
+
+// 🔥 REDIRECT TO FEE MODULE
+collectFee(id);
+}
+
+// ================= VIEW MEMBER =================
+
+function viewMember(id){
+
+let m = members.find(x=>x.id===id);
+
+let expected = monthsBetween(m.joinDate) * monthlyFee;
+let paid = totalPaid(id);
+let due = expected - paid;
+
+app.innerHTML = `
+<div class="card">
+<h3>Member Details</h3>
+
+<b>Name:</b> ${m.name}<br>
+<b>FatherName:</b> ${m.FatherName}<br>
+<b>Mobile:</b> ${m.mobile}<br>
+<b>Address:</b> ${m.address}<br>
+<b>Seat:</b> ${m.seat}<br>
+<b>Join Date:</b> ${m.joinDate}<br>
+<b>Total Paid:</b> ₹${paid}<br>
+<b>Total Due:</b> ₹${due}<br><br>
+
+<button onclick="collectFee('${id}')">Collect Fee</button>
+<button onclick="editMember('${id}')">Update Details</button>
+
+${currentUser==="owner" ?
+`<button onclick="deleteMember('${id}')">Delete Member</button>` : ""}
+
+<button onclick="seatLayout()">Back</button>
+</div>`;
+}
+
+// ================= EDIT MEMBER =================
+
+function editMember(id){
+
+let m = members.find(x=>x.id===id);
+
+app.innerHTML = `
+<div class="card">
+<h3>Edit Member</h3>
+
+<input id="eName" value="${m.name}">
+<input id="eFatherName" value="${m.FatherName}">
+<input id="eMobile" value="${m.mobile}">
+<input id="eAddress" value="${m.address}">
+<input type="date" id="eJoin" value="${m.joinDate}">
+
+<button onclick="updateMember('${id}')">Update</button>
+<button onclick="viewMember('${id}')">Cancel</button>
+</div>`;
+}
+
+function updateMember(id){
+
+let m = members.find(x=>x.id===id);
+
+m.name = document.getElementById("eName").value;
+m.FatherName = document.getElementById("eFatherName").value;
+m.mobile = document.getElementById("eMobile").value;
+m.address = document.getElementById("eAddress").value;
+m.joinDate = document.getElementById("eJoin").value;
+
+saveAll();
+viewMember(id);
+}
+
+// ================= DELETE MEMBER =================
+
+function deleteMember(id){
+
+if(!confirm("Are you sure to delete this member?")) return;
+
+let m = members.find(x=>x.id===id);
+
+deletedMembers.push(m);
+
+members = members.filter(x=>x.id!==id);
+
+saveAll();
+seatLayout();
+}
+// ================= FEE COLLECTION =================
+
+function collectFee(memberId){
+
+app.innerHTML = `
+<div class="card">
+<h3>Collect Fee</h3>
+
+<input id="fid" value="${memberId}" readonly>
+<input type="date" id="fdate" value="${new Date().toISOString().split("T")[0]}">
+<input id="famount" value="${monthlyFee}">
+
+<button onclick="saveFee()">Submit Payment</button>
+<button onclick="dashboard()">Cancel</button>
+</div>`;
+}
+
+function saveFee(){
+
+let receipt = "R" + Date.now();
+let memberId = document.getElementById("fid").value;
+let date = document.getElementById("fdate").value;
+let amount = parseInt(document.getElementById("famount").value);
+
+if(!date || isNaN(amount)){
+alert("Enter valid details");
+return;
+}
+
+pendingPayments.push({
+receipt:receipt,
+memberId:memberId,
+amount:amount,
+date:date
+});
+
+saveAll();
+alert("Payment Sent For Approval");
+dashboard();
+}
+
+// ================= APPROVAL PANEL =================
+
+function approvalPanel(){
+
+let html = `<div class="card">
+<h3>Approval Panel</h3>`;
+
+// ----- MEMBER APPROVALS -----
+html += `<h4>Member Approvals</h4>`;
+
+if(pendingMembers.length===0){
+html += "No Pending Members<br>";
+}
+
+pendingMembers.forEach(m=>{
+html += `
+<hr>
+<b>Name:</b> ${m.name}<br>
+<b>FatherName:</b> ${m.FatherName}<br>
+<b>Mobile:</b> ${m.mobile}<br>
+<b>Address:</b> ${m.address}<br>
+<b>Join Date:</b> ${m.joinDate}<br>
+<b>Seat:</b> ${m.seat}<br>
+<button onclick="approveMember('${m.id}')">Approve</button>
+<button onclick="rejectMember('${m.id}')">Reject</button>
+`;
+});
+
+// ----- PAYMENT APPROVALS -----
+html += `<h4>Payment Approvals</h4>`;
+
+if(pendingPayments.length===0){
+html += "No Pending Payments<br>";
+}
+
+pendingPayments.forEach(p=>{
+
+let member = members.find(x=>x.id===p.memberId) ||
+pendingMembers.find(x=>x.id===p.memberId);
+
+html += `
+<hr>
+<b>Receipt:</b> ${p.receipt}<br>
+<b>Name:</b> ${member?member.name:"Unknown"}<br>
+<b>Seat:</b> ${member?member.seat:"-"}<br>
+<b>Amount:</b> ₹${p.amount}<br>
+<b>Date:</b> ${p.date}<br>
+<button onclick="approvePayment('${p.receipt}')">Approve</button>
+<button onclick="rejectPayment('${p.receipt}')">Reject</button>
+`;
+});
+
+html += `<br><button onclick="dashboard()">Back</button></div>`;
+
+app.innerHTML = html;
+}
+
+function approveMember(id){
+let m = pendingMembers.find(x=>x.id===id);
+members.push(m);
+pendingMembers = pendingMembers.filter(x=>x.id!==id);
+saveAll();
+approvalPanel();
+}
+
+function rejectMember(id){
+pendingMembers = pendingMembers.filter(x=>x.id!==id);
+saveAll();
+approvalPanel();
+}
+
+function approvePayment(receipt){
+let p = pendingPayments.find(x=>x.receipt===receipt);
+payments.push(p);
+pendingPayments = pendingPayments.filter(x=>x.receipt!==receipt);
+saveAll();
+approvalPanel();
+}
+
+function rejectPayment(receipt){
+pendingPayments = pendingPayments.filter(x=>x.receipt!==receipt);
+saveAll();
+approvalPanel();
+}
+
+// ================= FEES MODULE (FULL LIST + EXCEL) =================
+
+function feesModule(){
+
+let html = `
+<div class="card">
+<h3>Fees Report</h3>
+<button onclick="exportCSV()">Download Excel</button>
+<table>
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Seat</th>
+<th>Paid</th>
+<th>Due</th>
+</tr>`;
+
+members.forEach(m=>{
+
+let expected = monthsBetween(m.joinDate) * monthlyFee;
+let paid = totalPaid(m.id);
+let due = expected - paid;
+
+html += `
+<tr>
+<td>${m.id}</td>
+<td>${m.name}</td>
+<td>${m.seat}</td>
+<td>${paid}</td>
+<td>${due}</td>
+</tr>`;
+});
+
+html += `</table>
+<button onclick="dashboard()">Back</button>
+</div>`;
+
+app.innerHTML = html;
+}
+
+function exportCSV(){
+
+let csv = "ID,Name,Seat,Paid,Due\n";
+
+members.forEach(m=>{
+let expected = monthsBetween(m.joinDate) * monthlyFee;
+let paid = totalPaid(m.id);
+let due = expected - paid;
+
+csv += `${m.id},${m.name},${m.seat},${paid},${due}\n`;
+});
+
+let blob = new Blob([csv], {type:"text/csv"});
+let url = URL.createObjectURL(blob);
+
+let a = document.createElement("a");
+a.href = url;
+a.download = "Library_Fees_Report.csv";
+a.click();
+}
+
+// ================= DELETED MEMBERS =================
+
+function deletedModule(){
+
+let html = `<div class="card">
+<h3>Deleted Members</h3>`;
+
+if(deletedMembers.length===0){
+html += "No Deleted Members<br>";
+}
+
+deletedMembers.forEach(m=>{
+html += `
+<hr>
+<b>Name:</b> ${m.name}<br>
+<b>Seat:</b> ${m.seat}<br>
+<button onclick="restoreMember('${m.id}')">Restore</button>
+`;
+});
+
+html += `<button onclick="dashboard()">Back</button></div>`;
+
+app.innerHTML = html;
+}
+
+function restoreMember(id){
+
+let m = deletedMembers.find(x=>x.id===id);
+
+let vacantList = [];
+
+for(let i=1;i<=TOTAL_SEATS;i++){
+if(!members.some(x=>x.seat===i)){
+vacantList.push(i);
+}
+}
+
+let options = vacantList.map(s=>`<option value="${s}">${s}</option>`).join("");
+
+app.innerHTML = `
+<div class="card">
+<h3>Assign Seat To ${m.name}</h3>
+
+<select id="newSeat">
+${options}
+</select>
+
+<button onclick="confirmRestore('${id}')">Confirm Restore</button>
+<button onclick="deletedModule()">Cancel</button>
+</div>`;
+}
+function confirmRestore(id){
+
+let m = deletedMembers.find(x=>x.id===id);
+let newSeat = parseInt(document.getElementById("newSeat").value);
+
+m.seat = newSeat;
+
+members.push(m);
+deletedMembers = deletedMembers.filter(x=>x.id!==id);
+
+saveAll();
+alert("Member Restored Successfully");
+deletedModule();
 }
 </script>
-
 </body>
 </html>
+
