@@ -86,7 +86,7 @@ text-align:center;
 </head>
 <body>
 
-<div class="header">Chanakya Library Management</div>
+<div class="header">The Chanakya Library</div>
 <div id="app"></div>
 
 <script>
@@ -98,6 +98,7 @@ let payments = JSON.parse(localStorage.getItem("payments") || "[]");
 let pendingPayments = JSON.parse(localStorage.getItem("pendingPayments") || "[]");
 let deletedMembers = JSON.parse(localStorage.getItem("deletedMembers") || "[]");
 let monthlyFee = parseInt(localStorage.getItem("monthlyFee") || "700");
+let TOTAL_SEATS=320;
 let currentUser = "";
 
 function saveAll(){
@@ -174,6 +175,10 @@ d.getFullYear()===now.getFullYear();
 }).reduce((sum,p)=>sum + parseInt(p.amount),0);
 }
 
+function vacantSeats(){
+return TOTAL_SEATS - members.length - pendingMembers.length;
+}
+
 // ================= DASHBOARD =================
 
 function dashboard(){
@@ -183,6 +188,7 @@ app.innerHTML = `
 <h3>Dashboard (${currentUser})</h3>
 
 <div class="stat">Active Members: ${members.length}</div>
+<div class="stat">Vacant Seats: ${vacantSeats()}</div>
 <div class="stat">Pending Member Approvals: ${pendingMembers.length}</div>
 <div class="stat">Pending Payments: ${pendingPayments.length}</div>
 <div class="stat">Total Collection Today: ₹${collectionToday()}</div>
@@ -271,6 +277,7 @@ app.innerHTML = `
 <h3>Add Member - Seat ${seat}</h3>
 
 <input id="mName" placeholder="Full Name">
+<input id="mFatherName" placeholder="Father's Name">
 <input id="mMobile" placeholder="Mobile Number">
 <input id="mAddress" placeholder="Address">
 <input type="date" id="mJoin" value="${new Date().toISOString().split("T")[0]}">
@@ -285,6 +292,7 @@ function saveMember(seat){
 let id = "M" + Date.now();
 
 let name = document.getElementById("mName").value.trim();
+let FatherName = document.getElementById("mFatherName").value.trim();
 let mobile = document.getElementById("mMobile").value.trim();
 let address = document.getElementById("mAddress").value.trim();
 let join = document.getElementById("mJoin").value;
@@ -297,6 +305,7 @@ return;
 pendingMembers.push({
 id:id,
 name:name,
+FatherName:FatherName,
 mobile:mobile,
 address:address,
 joinDate:join,
@@ -324,6 +333,7 @@ app.innerHTML = `
 <h3>Member Details</h3>
 
 <b>Name:</b> ${m.name}<br>
+<b>FatherName:</b> ${m.FatherName}<br>
 <b>Mobile:</b> ${m.mobile}<br>
 <b>Address:</b> ${m.address}<br>
 <b>Seat:</b> ${m.seat}<br>
@@ -352,6 +362,7 @@ app.innerHTML = `
 <h3>Edit Member</h3>
 
 <input id="eName" value="${m.name}">
+<input id="eFatherName" value="${m.FatherName}">
 <input id="eMobile" value="${m.mobile}">
 <input id="eAddress" value="${m.address}">
 <input type="date" id="eJoin" value="${m.joinDate}">
@@ -366,6 +377,7 @@ function updateMember(id){
 let m = members.find(x=>x.id===id);
 
 m.name = document.getElementById("eName").value;
+m.FatherName = document.getElementById("eFatherName").value;
 m.mobile = document.getElementById("eMobile").value;
 m.address = document.getElementById("eAddress").value;
 m.joinDate = document.getElementById("eJoin").value;
@@ -448,6 +460,7 @@ pendingMembers.forEach(m=>{
 html += `
 <hr>
 <b>Name:</b> ${m.name}<br>
+<b>FatherName:</b> ${m.FatherName}<br>
 <b>Mobile:</b> ${m.mobile}<br>
 <b>Address:</b> ${m.address}<br>
 <b>Join Date:</b> ${m.joinDate}<br>
@@ -604,14 +617,40 @@ function restoreMember(id){
 
 let m = deletedMembers.find(x=>x.id===id);
 
-if(members.some(x=>x.seat===m.seat)){
-alert("Seat already occupied");
-return;
+let vacantList = [];
+
+for(let i=1;i<=TOTAL_SEATS;i++){
+if(!members.some(x=>x.seat===i)){
+vacantList.push(i);
 }
+}
+
+let options = vacantList.map(s=>`<option value="${s}">${s}</option>`).join("");
+
+app.innerHTML = `
+<div class="card">
+<h3>Assign Seat To ${m.name}</h3>
+
+<select id="newSeat">
+${options}
+</select>
+
+<button onclick="confirmRestore('${id}')">Confirm Restore</button>
+<button onclick="deletedModule()">Cancel</button>
+</div>`;
+}
+function confirmRestore(id){
+
+let m = deletedMembers.find(x=>x.id===id);
+let newSeat = parseInt(document.getElementById("newSeat").value);
+
+m.seat = newSeat;
 
 members.push(m);
 deletedMembers = deletedMembers.filter(x=>x.id!==id);
+
 saveAll();
+alert("Member Restored Successfully");
 deletedModule();
 }
 </script>
