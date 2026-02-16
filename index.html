@@ -282,11 +282,13 @@ app.innerHTML = `
 <input id="mAddress" placeholder="Address">
 <input type="date" id="mJoin" value="${new Date().toISOString().split("T")[0]}">
 
+<label>Upload Photo</label>
+<input type="file" id="mPhoto" accept="image/*">
+
 <button onclick="saveMember(${seat})">Save & Go To Fee</button>
 <button onclick="seatLayout()">Cancel</button>
 </div>`;
 }
-
 function saveMember(seat){
 
 let id = "M" + Date.now();
@@ -297,11 +299,14 @@ let mobile = document.getElementById("mMobile").value.trim();
 let address = document.getElementById("mAddress").value.trim();
 let join = document.getElementById("mJoin").value;
 
+let file = document.getElementById("mPhoto").files[0];
+
 if(!name || !mobile || !join){
 alert("Please fill required fields");
 return;
 }
 
+function pushMember(photoData){
 pendingMembers.push({
 id:id,
 name:name,
@@ -309,11 +314,23 @@ FatherName:FatherName,
 mobile:mobile,
 address:address,
 joinDate:join,
-seat:seat
+seat:seat,
+photo:photoData
 });
-
 saveAll();
+collectFee(id); // keep your original flow
+}
 
+if(file){
+let reader = new FileReader();
+reader.onload = function(e){
+pushMember(e.target.result);
+};
+reader.readAsDataURL(file);
+}else{
+pushMember("");
+}
+}
 // 🔥 REDIRECT TO FEE MODULE
 collectFee(id);
 }
@@ -331,7 +348,7 @@ let due = expected - paid;
 app.innerHTML = `
 <div class="card">
 <h3>Member Details</h3>
-
+${m.photo ? `<img src="${m.photo}" width="120" style="border-radius:10px;margin-bottom:10px;"><br>` : ""}
 <b>Name:</b> ${m.name}<br>
 <b>FatherName:</b> ${m.FatherName}<br>
 <b>Mobile:</b> ${m.mobile}<br>
@@ -459,6 +476,7 @@ html += "No Pending Members<br>";
 pendingMembers.forEach(m=>{
 html += `
 <hr>
+${m.photo ? `<img src="${m.photo}" width="100" style="border-radius:8px;"><br>` : ""}
 <b>Name:</b> ${m.name}<br>
 <b>FatherName:</b> ${m.FatherName}<br>
 <b>Mobile:</b> ${m.mobile}<br>
@@ -602,6 +620,7 @@ html += "No Deleted Members<br>";
 deletedMembers.forEach(m=>{
 html += `
 <hr>
+${m.photo ? `<img src="${m.photo}" width="100" style="border-radius:8px;"><br>` : ""}
 <b>Name:</b> ${m.name}<br>
 <b>Seat:</b> ${m.seat}<br>
 <button onclick="restoreMember('${m.id}')">Restore</button>
